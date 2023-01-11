@@ -107,3 +107,32 @@ def contains_email_domain(data: email):
         "is_domain": re.fullmatch(regex, data.email) is not None,
     }
     return response
+
+
+from fastapi import UploadFile, File
+from fastapi.responses import FileResponse
+import cv2
+from typing import Optional
+
+
+@app.post("/cv_model/")
+async def cv_model(
+    data: UploadFile = File(...), h: Optional[int] = 28, w: Optional[int] = 28
+):
+    with open("image.jpg", "wb") as image:
+        content = await data.read()
+        image.write(content)
+        image.close()
+
+    img = cv2.imread("image.jpg")
+    res = cv2.resize(img, (h, w))
+
+    cv2.imwrite("image_resize.jpg", res)
+
+    response = {
+        "input": data,
+        "output": FileResponse("image_resize.jpg"),
+        "message": HTTPStatus.OK.phrase,
+        "status-code": HTTPStatus.OK,
+    }
+    return response
