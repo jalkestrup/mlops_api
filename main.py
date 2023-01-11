@@ -1,8 +1,20 @@
 from fastapi import FastAPI
 from http import HTTPStatus
 from enum import Enum
+import re
+from pydantic import BaseModel
 
 app = FastAPI()
+
+
+# Read database from existing database.csv file:
+with open("database.csv", "r") as file:
+    database = {"username": [], "password": []}
+    for line in file:
+        username, password = line.split(",")
+        database["username"].append(username)
+        # Remove the newline character
+        database["password"].append(password[:-1])
 
 
 class ItemEnum(Enum):
@@ -29,3 +41,69 @@ def read_item(item_id: int):
 @app.get("/restric_items/{item_id}")
 def read_item(item_id: ItemEnum):
     return {"item_id": item_id}
+
+
+@app.get("/query_items")
+def read_item(item_id: int = 1):
+    # Default value set to 1
+    return {"item_id": item_id}
+
+
+@app.post("/login/")
+def login(username: str, password: str):
+    username_db = database["username"]
+    password_db = database["password"]
+    if username not in username_db and password not in password_db:
+        with open("database.csv", "a") as file:
+            file.write(f"{username}, {password} \n")
+        username_db.append(username)
+        password_db.append(password)
+    return "login saved"
+
+
+@app.get("/login/")
+def get_login(username: str):
+    # Function that returns the password for a given username
+    username_db = database["username"]
+    if username in username_db:
+        index = username_db.index(username)
+        return database["password"][index]
+    else:
+        return "Username not found"
+
+
+@app.get("/text_model/")
+def contains_email(data: str):
+    regex = r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"
+    response = {
+        "input": data,
+        "message": HTTPStatus.OK.phrase,
+        "status-code": HTTPStatus.OK,
+        "is_email": re.fullmatch(regex, data) is not None,
+    }
+    return response
+
+
+class emailEnum(Enum):
+    gmail = "gmail"
+    hotmail = "hotmail"
+
+
+class email(BaseModel):
+    email: str
+    domain: emailEnum
+
+
+@app.post("/text_model/")
+def contains_email_domain(data: email):
+    if data.domain is emailEnum.gmail:
+        regex = r"\b[A-Za-z0-9._%+-]+@gmail+\.[A-Z|a-z]{2,}\b"
+    if data.domain is emailEnum.hotmail:
+        regex = r"\b[A-Za-z0-9._%+-]+@hotmail+\.[A-Z|a-z]{2,}\b"
+    response = {
+        "input": data,
+        "message": HTTPStatus.OK.phrase,
+        "status-code": HTTPStatus.OK,
+        "is_domain": re.fullmatch(regex, data.email) is not None,
+    }
+    return response
